@@ -6,6 +6,40 @@
 #include <stdio.h>
 #include <unistd.h>
 
+typedef enum {
+    PROTO_HELLO,
+} proto_type_e;
+
+// TLV
+typedef struct {
+    proto_type_e type;
+    unsigned short len;
+} proto_hdr_t;
+
+void handle_server(int fd) {
+    char buf[4096] = { 0 };
+    read(fd, buf, sizeof(proto_hdr_t) + sizeof(int));
+
+    proto_hdr_t *hdr = buf;
+    hdr->type = ntohl(hdr->type); // unpack the type
+    hdr->len = ntohs(hdr->len);
+
+    int *data = &hdr[1];
+    *data = ntohl(*data); // protocol version one, packed
+
+    if (hdr->type != PROTO_HELLO) {
+        printf("Protocol mismatch, failing.");
+        return;
+    }
+
+    if (*data != 1) {
+        printf("Protocol version mismatch, failing.");
+        return;
+    }
+
+    printf("Server connected, protocol v1.\n");
+}
+
 int main(int argc, char *argv[]) {
     if (argc != 2) {
         printf("Usage: %s <ip of the host>\n", argv[0]);
@@ -29,6 +63,8 @@ int main(int argc, char *argv[]) {
         close(fd);
         return 0;
     }
+
+    handle_server(fd);
 
     close(fd);
 }

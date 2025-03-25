@@ -4,6 +4,30 @@
 #include <stdio.h>
 #include <unistd.h>
 
+typedef enum {
+    PROTO_HELLO,
+} proto_type_e;
+
+// TLV
+typedef struct {
+    proto_type_e type;
+    unsigned short len;
+} proto_hdr_t;
+
+void handle_client(int fd) {
+    char buf[4096] = { 0 };
+    proto_hdr_t *hdr = buf;
+
+    hdr->type = htonl(PROTO_HELLO); // pack the type
+    hdr->len = sizeof(int);
+    int reallen = hdr->len;
+    hdr->len = htons(hdr->len); // pack the len
+
+    int *data = (int *)&hdr[1];
+    *data = htonl(1); // protocol version one, packed
+    write(fd, hdr, sizeof(proto_hdr_t) + reallen);
+}
+
 int main() {
     // same as struct sockaddr but adds named fields that can be filled in
     // we use {0} to zero out the struct
@@ -36,15 +60,20 @@ int main() {
         return -1;
     }
 
-    // accept
-    // blocks the program's execution and waits for a connection to be taken in
-    // when it does it returns a new fd that respresents the connection between the 2 computers
-    int cfd = accept(fd, (struct sockaddr *)&clientInfo, &clientSize);
-    if (cfd == -1) {
-        perror("accept");
-        close(fd);
-        return -1;
+    while (1) {
+        // accept
+        // blocks the program's execution and waits for a connection to be taken in
+        // when it does it returns a new fd that respresents the connection between the 2 computers
+        int cfd = accept(fd, (struct sockaddr *)&clientInfo, &clientSize);
+        if (cfd == -1) {
+            perror("accept");
+            close(fd);
+            return -1;
+        }
+
+        handle_client(cfd);
+
+        close(cfd);
     }
 
-    close(cfd);
 }
